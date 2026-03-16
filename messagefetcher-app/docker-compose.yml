@@ -1,20 +1,15 @@
 services:
-  # Container 2 (The one holding the value)
-  backend-node:
-    image: python:3.9-slim
-    working_dir: /app
-    volumes:
-      - .:/app
-    command: sh -c "pip install flask && python backend.py"
+  # Container 2: The Value Holder
+  backend-service:
+    build: .
+    command: python backend.py
+    # No ports exposed to the host, stays private
 
-  # Container 1 (The one printing the value)
-  frontend-node:
-    image: python:3.9-slim
-    working_dir: /app
-    volumes:
-      - .:/app
+  # Container 1: The Value Printer
+  frontend-service:
+    build: .
     ports:
       - "7777:5000"
-    command: sh -c "pip install flask requests && python frontend.py"
     depends_on:
-      - backend-node
+      - backend-service
+    command: python frontend.py
