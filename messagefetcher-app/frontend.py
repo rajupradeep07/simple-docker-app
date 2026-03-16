@@ -1,3 +1,4 @@
+# frontend.py
 import requests
 from flask import Flask
 
@@ -6,9 +7,8 @@ app = Flask(__name__)
 @app.route('/')
 def display():
     try:
-        # Calls the backend service
-        response = requests.get("http://backend-service:6000/data")
-        # This will show up in your browser
+        # Changed "/data" to "/get-value" to match backend.py
+        response = requests.get("http://backend-service:6000/get-value")
         return f"<h1>Frontend (Container 1)</h1><p>Data from Backend: <b>{response.text}</b></p>"
     except Exception as e:
         return f"Error: {e}"
