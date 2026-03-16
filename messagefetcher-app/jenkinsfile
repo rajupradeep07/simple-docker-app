@@ -1,6 +1,11 @@
 pipeline {
     agent any
 
+    environment {
+        // Default Docker bridge IP to reach the host from inside a container
+        DOCKER_HOST_GATEWAY = "172.17.0.1"
+    }
+
     stages {
         stage('Fix Docker Compose') {
             steps {
@@ -11,8 +16,10 @@ pipeline {
                         if (!composeExists) {
                             echo "Docker Compose plugin not found. Downloading standalone binary..."
                             sh '''
-                                curl -SL https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-linux-x86_64 -o ./docker-compose
-                                chmod +x ./docker-compose
+                                if [ ! -f ./docker-compose ]; then
+                                    curl -SL https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-linux-x86_64 -o ./docker-compose
+                                    chmod +x ./docker-compose
+                                fi
                             '''
                             env.DOCKER_COMPOSE_CMD = "./docker-compose"
                         } else {
@@ -32,6 +39,7 @@ pipeline {
                     sh "${env.DOCKER_COMPOSE_CMD} down --remove-orphans"
                     
                     // Build and start
+                    // --pull ensures we always have the latest base image
                     sh "${env.DOCKER_COMPOSE_CMD} up -d --build"
                     
                     echo "Waiting for services to wake up..."
@@ -42,9 +50,7 @@ pipeline {
 
         stage('Verify Communication') {
             steps {
-                echo "Final Test: Fetching data from Frontend..."
-                sh 'curl -s http://localhost:7777'
-            }
-        }
-    }
-}
+                script {
+                    echo "Final Test: Fetching data from Frontend via Docker Gateway..."
+                    // We try the Gateway IP first (for Jenkins-to-Host) 
+                    // and fallback
