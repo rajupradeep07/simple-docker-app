@@ -1,24 +1,45 @@
 pipeline {
     agent any
 
+    environment {
+        // This helps Jenkins find the docker binary if it's in a non-standard path
+        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
+    }
+
     stages {
-        stage('Deploy App') {
+        stage('Environment Check') {
             steps {
-                // Step into the subfolder before running Docker commands
+                // This helps us debug if docker is actually available
+                sh 'docker version'
+                sh 'docker compose version'
+            }
+        }
+
+        stage('Clean and Deploy') {
+            steps {
+                // Step into your subfolder
                 dir('messagefetcher-app') {
-                    // Pre-cleanup to ensure no old containers are blocking ports
-                    sh 'docker-compose down --remove-orphans'
+                    echo "Stopping old containers to free up port 7777..."
+                    // Using 'docker compose' (modern) instead of 'docker-compose'
+                    sh 'docker compose down --remove-orphans'
                     
-                    // Build and start
-                    sh 'docker-compose up -d --build'
+                    echo "Building and starting containers..."
+                    sh 'docker compose up -d --build'
                     
-                    echo "Waiting for containers..."
-                    sleep 5
-                    
-                    // Verify the output
-                    sh 'curl -s http://localhost:7777'
+                    echo "Waiting 10 seconds for Flask to initialize..."
+                    sleep 10
                 }
             }
         }
+
+        stage('Verify Communication') {
+            steps {
+                echo "Testing Frontend (Container 1) fetching from Backend (Container 2)..."
+                // This will print the HTML/Text output to your Jenkins console
+                sh 'curl -s http://localhost:7777'
+            }
+        }
     }
+
+    // Notice: No 'docker compose down' here, so the app stays running on port 7777
 }
