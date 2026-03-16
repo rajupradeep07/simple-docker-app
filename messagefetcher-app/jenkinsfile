@@ -1,32 +1,40 @@
 pipeline {
     agent any
 
-    environment {
-        // This helps Jenkins find the docker binary if it's in a non-standard path
-        PATH = "/usr/local/bin:/usr/bin:/bin:${env.PATH}"
-    }
-
     stages {
-        stage('Environment Check') {
+        stage('Fix Docker Compose') {
             steps {
-                // This helps us debug if docker is actually available
-                sh 'docker version'
-                sh 'docker compose version'
+                dir('messagefetcher-app') {
+                    script {
+                        // Check if 'docker compose' works. If not, download the standalone binary.
+                        def composeExists = sh(script: "docker compose version", returnStatus: true) == 0
+                        if (!composeExists) {
+                            echo "Docker Compose plugin not found. Downloading standalone binary..."
+                            sh '''
+                                curl -SL https://github.com/docker/compose/releases/download/v2.26.1/docker-compose-linux-x86_64 -o ./docker-compose
+                                chmod +x ./docker-compose
+                            '''
+                            env.DOCKER_COMPOSE_CMD = "./docker-compose"
+                        } else {
+                            env.DOCKER_COMPOSE_CMD = "docker compose"
+                        }
+                    }
+                }
             }
         }
 
         stage('Clean and Deploy') {
             steps {
-                // Step into your subfolder
                 dir('messagefetcher-app') {
-                    echo "Stopping old containers to free up port 7777..."
-                    // Using 'docker compose' (modern) instead of 'docker-compose'
-                    sh 'docker compose down --remove-orphans'
+                    echo "Using command: ${env.DOCKER_COMPOSE_CMD}"
                     
-                    echo "Building and starting containers..."
-                    sh 'docker compose up -d --build'
+                    // Cleanup old containers
+                    sh "${env.DOCKER_COMPOSE_CMD} down --remove-orphans"
                     
-                    echo "Waiting 10 seconds for Flask to initialize..."
+                    // Build and start
+                    sh "${env.DOCKER_COMPOSE_CMD} up -d --build"
+                    
+                    echo "Waiting for services to wake up..."
                     sleep 10
                 }
             }
@@ -34,12 +42,9 @@ pipeline {
 
         stage('Verify Communication') {
             steps {
-                echo "Testing Frontend (Container 1) fetching from Backend (Container 2)..."
-                // This will print the HTML/Text output to your Jenkins console
+                echo "Final Test: Fetching data from Frontend..."
                 sh 'curl -s http://localhost:7777'
             }
         }
     }
-
-    // Notice: No 'docker compose down' here, so the app stays running on port 7777
 }
