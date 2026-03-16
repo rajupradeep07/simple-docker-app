@@ -53,4 +53,19 @@ pipeline {
                 script {
                     echo "Final Test: Fetching data from Frontend via Docker Gateway..."
                     // We try the Gateway IP first (for Jenkins-to-Host) 
-                    // and fallback
+                    // and fallback to localhost (if Jenkins is on the host directly)
+                    sh "curl -s http://${env.DOCKER_HOST_GATEWAY}:7777 || curl -s http://localhost:7777"
+                }
+            }
+        }
+    }
+    
+    post {
+        failure {
+            echo "Deployment or Verification failed. Check container logs:"
+            dir('messagefetcher-app') {
+                sh "${env.DOCKER_COMPOSE_CMD} logs"
+            }
+        }
+    }
+}
