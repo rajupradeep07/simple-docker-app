@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+
+    stages {
+        stage('Clean Old Containers') {
+            steps {
+                // Stops any previous run to avoid port conflicts
+                sh 'docker-compose down --remove-orphans'
+            }
+        }
+
+        stage('Build and Start') {
+            steps {
+                // Build images and start containers in detached mode (-d)
+                sh 'docker-compose up -d --build'
+            }
+        }
+
+        stage('Verify & Output') {
+            steps {
+                // Give Flask 5 seconds to wake up
+                sleep 5
+                // Print the frontend output to the Jenkins Console log
+                sh 'curl -s http://localhost:7777'
+            }
+        }
+    }
+
+    // Notice: NO 'docker-compose down' in the post block.
+    // This ensures the containers stay running after Jenkins finishes.
+}
